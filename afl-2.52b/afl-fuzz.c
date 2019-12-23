@@ -7703,7 +7703,8 @@ static void save_cmdline(u32 argc, char** argv) {
 
 /* Main entry point */
 
-int main(int argc, char** argv) {
+//主函数开始
+int main(int argc, char** argv) {  
 
   s32 opt;
   u64 prev_queued = 0;
@@ -7723,6 +7724,7 @@ int main(int argc, char** argv) {
   gettimeofday(&tv, &tz);
   srandom(tv.tv_sec ^ tv.tv_usec ^ getpid());
 
+  //获取各种环境的设置，选项参数等，各种模式参数选项
   while ((opt = getopt(argc, argv, "+i:o:f:m:t:T:dnCB:S:M:x:Q")) > 0)
 
     switch (opt) {
@@ -7893,17 +7895,19 @@ int main(int argc, char** argv) {
 
       default:
 
+        //显示使用提示
         usage(argv[0]);
 
     }
 
   if (optind == argc || !in_dir || !out_dir) usage(argv[0]);
 
-  setup_signal_handlers();
-  check_asan_opts();
+  setup_signal_handlers(); //设置信号句柄
+  check_asan_opts(); //快速内存错误检测工具
 
   if (sync_id) fix_up_sync();
 
+  //一系列检查
   if (!strcmp(in_dir, out_dir))
     FATAL("Input and output directories can't be the same");
 
@@ -7936,40 +7940,44 @@ int main(int argc, char** argv) {
   if (getenv("AFL_LD_PRELOAD"))
     FATAL("Use AFL_PRELOAD instead of AFL_LD_PRELOAD");
 
-  save_cmdline(argc, argv);
-
-  fix_up_banner(argv[optind]);
+  save_cmdline(argc, argv); //保存命令行参数
+ 
+  fix_up_banner(argv[optind]); //修建并创建一个运行横幅
 
   check_if_tty();
 
-  get_core_count();
+  get_core_count(); //获取CPU核心数目
 
 #ifdef HAVE_AFFINITY
-  bind_to_free_cpu();
+  bind_to_free_cpu(); //构建绑定到特定核心的进程列表。如果什么也找不到，返回-1
 #endif /* HAVE_AFFINITY */
 
-  check_crash_handling();
-  check_cpu_governor();
+  check_crash_handling(); //确保核心转储不会进入程序
+  check_cpu_governor(); //检查CPU管理者
 
-  setup_post();
-  setup_shm();
+  setup_post(); //加载后处理器
+  setup_shm(); //设置共享内存块，初始化trace_bits参数并置为0
   init_count_class16();
 
-  setup_dirs_fds();
-  read_testcases();
-  load_auto();
+  setup_dirs_fds(); //设置输出目录和文件描述符
+  read_testcases(); //读取所有测试用例，对它进行排队测试
+  load_auto(); //？？？
 
-  pivot_inputs();
 
-  if (extras_dir) load_extras(extras_dir);
+  pivot_inputs(); 
+   //输出目录中为输入测试用例创建硬链接，选择好名称并相应地旋转。使用函数link_or_copy重新命名并且拷贝；
+  //使用函数mark_as_det_done为已经经过确定性变异（deterministic）阶段的testcase文件放入deterministic_done文件夹。
+  //这样经过deterministic的testcase就不用浪费时间进行重复。
 
-  if (!timeout_given) find_timeout();
+  if (extras_dir) load_extras(extras_dir); //从extra目录中读取token并按大小排序
+
+  if (!timeout_given) find_timeout(); //超时函数
 
   detect_file_args(argv + optind + 1);
 
-  if (!out_file) setup_stdio_file();
+  if (!out_file) setup_stdio_file(); //设置文件输出目录
 
-  check_binary(argv[optind]);
+  check_binary(argv[optind]); //检查二进制文件
 
   start_time = get_cur_time();
 
@@ -7978,7 +7986,8 @@ int main(int argc, char** argv) {
   else
     use_argv = argv + optind;
 
-  perform_dry_run(use_argv);
+  //从这里开始第一遍Fuzz
+  perform_dry_run(use_argv); //执行预先准备的所有testcases，生成初始化的queue呗bitmap，只对初始输入执行一次
 
   cull_queue();
 
