@@ -1981,13 +1981,14 @@ EXP_ST void init_forkserver(char** argv) {
   s32 rlen;
 
   ACTF("Spinning up the fork server...");
-
+  //检查输入管道是否存在
   if (pipe(st_pipe) || pipe(ctl_pipe)) PFATAL("pipe() failed");
 
   forksrv_pid = fork();
 
   if (forksrv_pid < 0) PFATAL("fork() failed");
 
+  //子进程空间
   if (!forksrv_pid) {
 
     struct rlimit r;
@@ -2035,7 +2036,7 @@ EXP_ST void init_forkserver(char** argv) {
 
     setsid();
 
-    dup2(dev_null_fd, 1);
+    dup2(dev_null_fd, 1); 
     dup2(dev_null_fd, 2);
 
     if (out_file) {
@@ -7960,7 +7961,7 @@ int main(int argc, char** argv) {
   init_count_class16();
 
   setup_dirs_fds(); //设置输出目录和文件描述符
-  read_testcases(); //读取所有测试用例，对它进行排队测试
+  read_testcases(); //读取所有测试用例，对它进行排队测试，期间会调用add_to_queue函数（会对输入用例进行去重）
   load_auto(); //？？？
 
 
@@ -7979,16 +7980,18 @@ int main(int argc, char** argv) {
 
   check_binary(argv[optind]); //检查二进制文件
 
-  start_time = get_cur_time();
+  //从这里开始第一遍Fuzz
+  start_time = get_cur_time(); //获取开始时间
 
-  if (qemu_mode)
+  if (qemu_mode) //检查是不是QUME模式
     use_argv = get_qemu_argv(argv[0], argv + optind, argc - optind);
   else
     use_argv = argv + optind;
 
-  //从这里开始第一遍Fuzz
-  perform_dry_run(use_argv); //执行预先准备的所有testcases，生成初始化的queue呗bitmap，只对初始输入执行一次
-
+  
+  perform_dry_run(use_argv); //执行预先准备的所有testcases，生成初始化的queue的bitmap，只对初始输入执行一次
+  
+  //精简队列
   cull_queue();
 
   show_init_stats();
@@ -8011,6 +8014,7 @@ int main(int argc, char** argv) {
   while (1) {
 
     u8 skipped_fuzz;
+
 
     cull_queue();
 
